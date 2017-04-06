@@ -65,3 +65,6 @@ target_link_libraries (tcp-server LINK_PUBLIC uv)
 
 add_executable(tcp-client tcp-client.c)
 target_link_libraries (tcp-client LINK_PUBLIC uv)
+
+add_executable(echo-server echo-server.c)
+target_link_libraries (echo-server LINK_PUBLIC uv)
