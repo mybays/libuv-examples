@@ -4,8 +4,7 @@
 
 #include <uv.h>
 
-
-static uv_timer_t    pacemaker;
+static uv_timer_t pacemaker;
 
 static char* _command = "hello world";
 
@@ -29,12 +28,13 @@ static void on_write(uv_write_t* req, int status)
 		printf("error:%s:%d:%s:%s\r\n",__FUNCTION__,status,uv_strerror(status),uv_err_name(status));
 		uv_read_stop((uv_stream_t*)req->handle);
 		uv_close((uv_handle_t*)req->handle, NULL);
+		uv_timer_stop(&pacemaker);
 		uv_loop_close(uv_default_loop());
 	}
 }
 
 
-void on_read(uv_stream_t *client, ssize_t nread, const uv_buf_t* buf)
+void on_read(uv_stream_t *stream, ssize_t nread, const uv_buf_t* buf)
 {
   if (nread < 0)
   {
@@ -44,8 +44,9 @@ void on_read(uv_stream_t *client, ssize_t nread, const uv_buf_t* buf)
     }
 
     fprintf(stderr, "Read error!\n");
-    uv_close((uv_handle_t*)client, NULL);
-    uv_read_stop(client);
+    uv_close((uv_handle_t*)stream, NULL);
+    uv_timer_stop(&pacemaker);
+    uv_read_stop(stream);
     uv_loop_close(uv_default_loop());
     return;
   }
@@ -55,10 +56,10 @@ void on_read(uv_stream_t *client, ssize_t nread, const uv_buf_t* buf)
     printf("nread == 0\r\n");
     return;
   }
+  //处理接收到的数据
   printf("debugread:%s:%ld:%ld\r\n",buf->base,nread,buf->len);
 
   free(buf->base);
-  //free(buf);
 }
 
 static void on_pace_timer(uv_timer_t* handle)
@@ -72,6 +73,12 @@ static void on_pace_timer(uv_timer_t* handle)
 
 static void on_connect(uv_connect_t* req, int status)
 {
+	if (status < 0)
+	{
+		printf("error:%s:%d:%s:%s\r\n",__FUNCTION__,status,uv_strerror(status),uv_err_name(status));
+    	uv_loop_close(uv_default_loop());
+    	return;
+	}
 	uv_buf_t buffer = uv_buf_init(_command, strlen(_command));
 	uv_stream_t* stream = req->handle;
 	
@@ -83,7 +90,7 @@ static void on_connect(uv_connect_t* req, int status)
 
 	uv_timer_init(uv_default_loop(), &pacemaker);
 	pacemaker.data = stream;
-	uv_timer_start(&pacemaker, on_pace_timer, 2, 2);
+	uv_timer_start(&pacemaker, on_pace_timer, 1000, 1000);
 }
 
 int main(int argc, char** argv)

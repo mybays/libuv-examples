@@ -38,7 +38,7 @@ void echo_write(uv_write_t *req, int status)
 * void (*uv_read_cb)(uv_stream_t* stream, ssize_t nread, const uv_buf_t* buf)
 * 
 */
-void echo_read(uv_stream_t *client, ssize_t nread, uv_buf_t* buf)
+void echo_read(uv_stream_t *stream, ssize_t nread, uv_buf_t* buf)
 {
   if (nread < 0)
   {
@@ -48,7 +48,7 @@ void echo_read(uv_stream_t *client, ssize_t nread, uv_buf_t* buf)
     }
 
     fprintf(stderr, "Read error!\n");
-    uv_close((uv_handle_t*)client, NULL);
+    uv_close((uv_handle_t*)stream, NULL);
     return;
   }
 
@@ -65,7 +65,7 @@ void echo_read(uv_stream_t *client, ssize_t nread, uv_buf_t* buf)
   write_req->data = (void *)&sndbuf;
   printf("debug:%s:%ld\r\n",sndbuf.base,sndbuf.len);
   //uv_write的返回值是不是传给uv_write_cb函数了?
-  uv_write(write_req, client, write_req->data, 1, echo_write);
+  uv_write(write_req, stream, write_req->data, 1, echo_write);
 
 }
 
@@ -79,7 +79,7 @@ void on_new_connection(uv_stream_t *server, int status)
   //status不为0则异常
   if(0 > status)
   {
-    printf("error:%s:%s\r\n",uv_strerror(status),uv_err_name(status));
+    printf("on new connection error:%s:%s\r\n",uv_strerror(status),uv_err_name(status));
     return;
   }
 
