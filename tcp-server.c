@@ -9,9 +9,9 @@ uv_loop_t *loop;
 */
 void alloc_buffer(uv_handle_t *handle, size_t suggested_size,uv_buf_t* buf)
 {
-  printf("debug:buf0:%p\r\n",buf);
+  //printf("debug:buf0:%p\r\n",buf);
   *buf=uv_buf_init((char*) malloc(suggested_size), suggested_size);
-  printf("debug:buf1:%p\r\n",buf);
+  //printf("debug:buf1:%p\r\n",buf);
   //uv_buf_init前后的buf指针是一样的,为什么?
 }
 
@@ -26,7 +26,6 @@ void echo_write(uv_write_t *req, int status)
     printf("error:%s:%s:%s\r\n",__FUNCTION__,uv_strerror(status),uv_err_name(status));
   }
   //此req和uv_write的req是同一个
-
 
   uv_buf_t* temp=(uv_buf_t*)req->data;
 
@@ -58,10 +57,6 @@ void echo_read(uv_stream_t *client, ssize_t nread, uv_buf_t* buf)
     printf("nread == 0\r\n");
     return;
   }
-
-  printf("nread:%ld\r\n",nread);
-
-
   
   uv_buf_t sndbuf;
   sndbuf = uv_buf_init(buf->base, strlen(buf->base));
@@ -104,7 +99,7 @@ void on_new_connection(uv_stream_t *server, int status)
   }
 }
 
-int main()
+int main(int argc, char** argv)
 {
   loop = uv_default_loop();
 
@@ -112,7 +107,7 @@ int main()
   uv_tcp_init(loop, &server);
 
   struct sockaddr_in bind_addr;
-  uv_ip4_addr("0.0.0.0", 7000,&bind_addr);
+  uv_ip4_addr(argv[1], atoi(argv[2]),&bind_addr);
   uv_tcp_bind(&server, (const struct sockaddr *)&bind_addr,0);
   int r = uv_listen((uv_stream_t*) &server, 128, on_new_connection);
   if (r)

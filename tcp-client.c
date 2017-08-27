@@ -5,50 +5,48 @@
 #include <uv.h>
 
 
-static uv_tcp_t      _socket;
-static uv_connect_t  _connect;
-//static uv_shutdown_t _shutdown;
-static uv_timer_t    _pacemaker;
+static uv_timer_t    pacemaker;
 
 static char* _command = "hello world";
 
 
 void alloc_buffer(uv_handle_t *handle, size_t suggested_size,uv_buf_t* buf)
 {
-  printf("debug:buf0:%p\r\n",buf);
+  //printf("debug:buf0:%p,%p,%ld\r\n",buf,buf->base,buf->len);
   *buf=uv_buf_init((char*) malloc(suggested_size), suggested_size);
-  printf("debug:buf1:%p\r\n",buf);
+  //printf("debug:buf1:%p,%p,%ld\r\n",buf,buf->base,buf->len);
   //uv_buf_init前后的buf指针是一样的,为什么?
+  //buf->base才是变化的
+  //tcmalloc优化
 }
 
-static void _on_write(uv_write_t* req, int status)
+static void on_write(uv_write_t* req, int status)
 {
+	free(req->data);
 	free(req);
 	if (status < 0)
-  {
-    printf("error:%s:%d:%s:%s\r\n",__FUNCTION__,status,uv_strerror(status),uv_err_name(status));
-  }
-/*
-	uv_stream_t* stream;
-
-	stream = req->handle;
-
-	uv_shutdown(&_shutdown, stream, NULL);
-*/
+	{
+		printf("error:%s:%d:%s:%s\r\n",__FUNCTION__,status,uv_strerror(status),uv_err_name(status));
+		uv_read_stop((uv_stream_t*)req->handle);
+		uv_close((uv_handle_t*)req->handle, NULL);
+		uv_loop_close(uv_default_loop());
+	}
 }
 
 
-void on_read(uv_stream_t *client, ssize_t nread, uv_buf_t* buf)
+void on_read(uv_stream_t *client, ssize_t nread, const uv_buf_t* buf)
 {
   if (nread < 0)
   {
-    if(nread == UV__EOF )
+    if(nread == UV__EOF)
     {
       printf("remote closed.\r\n");
     }
 
     fprintf(stderr, "Read error!\n");
     uv_close((uv_handle_t*)client, NULL);
+    uv_read_stop(client);
+    uv_loop_close(uv_default_loop());
     return;
   }
 
@@ -57,64 +55,50 @@ void on_read(uv_stream_t *client, ssize_t nread, uv_buf_t* buf)
     printf("nread == 0\r\n");
     return;
   }
+  printf("debugread:%s:%ld:%ld\r\n",buf->base,nread,buf->len);
 
-  printf("nread:%ld\r\n",nread);
-  printf("debugread:%s:%ld\r\n",buf->base,buf->len);
-
-  //free(buf->base);
+  free(buf->base);
   //free(buf);
 }
 
-static void _on_pace_timer(uv_timer_t* handle)
+static void on_pace_timer(uv_timer_t* handle)
 {
-	uv_buf_t buffer;
-	uv_stream_t* stream;
-	uv_write_t*  write_req;
+	uv_stream_t* stream = handle->data;
+	uv_buf_t buffer = uv_buf_init(_command, strlen(_command));
+	uv_write_t*  write_req = malloc(sizeof(*write_req));
 
-	stream = handle->data;
-	buffer = uv_buf_init(_command, strlen(_command));
-
-	write_req = malloc(sizeof(*write_req));
-	uv_write(write_req, stream, &buffer, 1, _on_write);
+	uv_write(write_req, stream, &buffer, 1, on_write);
 }
 
-static void _on_connect(uv_connect_t* req, int status)
+static void on_connect(uv_connect_t* req, int status)
 {
-	uv_buf_t buffer;
-	uv_stream_t* stream;
-	uv_write_t*  write_req;
+	uv_buf_t buffer = uv_buf_init(_command, strlen(_command));
+	uv_stream_t* stream = req->handle;
+	
+	printf("connected.\r\n");
+	uv_read_start(stream,alloc_buffer,on_read);
 
-	stream = req->handle;
-	buffer = uv_buf_init(_command, strlen(_command));
+	uv_write_t* write_req = malloc(sizeof(*write_req));
+	uv_write(write_req, stream, &buffer, 1, on_write);
 
-
-	printf("debug1\r\n");
-	uv_read_start((uv_stream_t*)req->handle,alloc_buffer,on_read);
-
-	write_req = malloc(sizeof(*write_req));
-	uv_write(write_req, stream, &buffer, 1, _on_write);
-
-	uv_timer_init(uv_default_loop(), &_pacemaker);
-	_pacemaker.data = stream;
-	uv_timer_start(&_pacemaker, _on_pace_timer, 2000, 2000);
+	uv_timer_init(uv_default_loop(), &pacemaker);
+	pacemaker.data = stream;
+	uv_timer_start(&pacemaker, on_pace_timer, 2, 2);
 }
 
 int main(int argc, char** argv)
 {
-	uv_loop_t* loop;
-	struct sockaddr_in dest;
+	uv_loop_t* loop = uv_default_loop();
 
-	loop = uv_default_loop();
+	static uv_connect_t connect;
 
-	//uv_timer_init(server->loop, &server->watchdog);
-	//server->watchdog.data = server;
-	//uv_timer_start(&server->watchdog, _on_watchdog_timer, 5000, 5000);
+	static uv_tcp_t socket;
+	uv_tcp_init(loop, &socket);
 
-	uv_tcp_init(loop, &_socket);
-	//_socket.data = server;
+	struct sockaddr_in server_addr;
+	uv_ip4_addr(argv[1], atoi(argv[2]), &server_addr);
 
-	uv_ip4_addr("127.0.0.1", 7000 ,&dest);
-	uv_tcp_connect(&_connect, &_socket, (const struct sockaddr*)&dest, _on_connect);
+	uv_tcp_connect(&connect, &socket, (const struct sockaddr*)&server_addr, on_connect);
 
 	uv_run(loop, UV_RUN_DEFAULT);
 
