@@ -5,6 +5,7 @@
 
 void alloc_buffer(uv_handle_t *handle, size_t suggested_size,uv_buf_t* buf)
 {
+    //一次申请,多次使用?
     //2 way to alloc buffer.
     /*
     static char buffer[1024];
@@ -27,7 +28,7 @@ void on_read(uv_udp_t *handle, ssize_t nread, const uv_buf_t* buf, const struct 
     if(nread<0)
     {
         printf("read error.\r\n");
-        //free(req);
+        free(req);
         return;
     }
     if(nread == 0)
@@ -42,6 +43,7 @@ void on_read(uv_udp_t *handle, ssize_t nread, const uv_buf_t* buf, const struct 
     sndbuf.len=nread;
     printf("base:0x%x,size:%lu\r\n",&(sndbuf.base),sndbuf.len);
     uv_udp_send(req,handle,&sndbuf,1,addr,on_send);
+    //free(buf);
 }
 
 

@@ -13,9 +13,21 @@ static uv_timer_t    _pacemaker;
 static char* _command = "hello world";
 
 
+void alloc_buffer(uv_handle_t *handle, size_t suggested_size,uv_buf_t* buf)
+{
+  printf("debug:buf0:%p\r\n",buf);
+  *buf=uv_buf_init((char*) malloc(suggested_size), suggested_size);
+  printf("debug:buf1:%p\r\n",buf);
+  //uv_buf_init前后的buf指针是一样的,为什么?
+}
+
 static void _on_write(uv_write_t* req, int status)
 {
 	free(req);
+	if (status < 0)
+  {
+    printf("error:%s:%d:%s:%s\r\n",__FUNCTION__,status,uv_strerror(status),uv_err_name(status));
+  }
 /*
 	uv_stream_t* stream;
 
@@ -23,6 +35,34 @@ static void _on_write(uv_write_t* req, int status)
 
 	uv_shutdown(&_shutdown, stream, NULL);
 */
+}
+
+
+void on_read(uv_stream_t *client, ssize_t nread, uv_buf_t* buf)
+{
+  if (nread < 0)
+  {
+    if(nread == UV__EOF )
+    {
+      printf("remote closed.\r\n");
+    }
+
+    fprintf(stderr, "Read error!\n");
+    uv_close((uv_handle_t*)client, NULL);
+    return;
+  }
+
+  if (nread == 0)
+  {
+    printf("nread == 0\r\n");
+    return;
+  }
+
+  printf("nread:%ld\r\n",nread);
+  printf("debugread:%s:%ld\r\n",buf->base,buf->len);
+
+  //free(buf->base);
+  //free(buf);
 }
 
 static void _on_pace_timer(uv_timer_t* handle)
@@ -46,6 +86,10 @@ static void _on_connect(uv_connect_t* req, int status)
 
 	stream = req->handle;
 	buffer = uv_buf_init(_command, strlen(_command));
+
+
+	printf("debug1\r\n");
+	uv_read_start((uv_stream_t*)req->handle,alloc_buffer,on_read);
 
 	write_req = malloc(sizeof(*write_req));
 	uv_write(write_req, stream, &buffer, 1, _on_write);

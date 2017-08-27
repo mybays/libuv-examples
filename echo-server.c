@@ -90,7 +90,7 @@ static void after_read_2(uv_stream_t* handle, ssize_t nread, uv_buf_t buf);
 
 static void after_write(uv_write_t* req, int status) {
     write_req_t* wr;
-    uv_err_t err;
+    uv_errno_t err;
 
     /* Free the read/write buffer and the request */
     wr = (write_req_t*) req;

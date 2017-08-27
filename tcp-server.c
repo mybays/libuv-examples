@@ -64,10 +64,11 @@ void echo_read(uv_stream_t *client, ssize_t nread, uv_buf_t* buf)
 
   
   uv_buf_t sndbuf;
+  sndbuf = uv_buf_init(buf->base, strlen(buf->base));
 
   uv_write_t *write_req = (uv_write_t*)malloc(sizeof(uv_write_t));
-  write_req->data = (void*)buf;
-  
+  write_req->data = (void *)&sndbuf;
+  printf("debug:%s:%ld\r\n",sndbuf.base,sndbuf.len);
   //uv_write的返回值是不是传给uv_write_cb函数了?
   uv_write(write_req, client, write_req->data, 1, echo_write);
 
